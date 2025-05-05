@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":nms:1.19.4", "shadow")) { isTransitive = false }
     implementation(project(":nms:1.20.6", "shadow")) { isTransitive = false }
     implementation(project(":nms:1.21.3", "shadow")) { isTransitive = false }
+    implementation(project(":nms:1.21.5", "shadow")) { isTransitive = false }
     compileOnly(libs.paper.v11605)
 
     implementation(platform(libs.koin.bom)) {
@@ -75,7 +76,7 @@ bukkit {
     apiVersion = "1.16"
     authors = listOf("KPidS", "Apehum")
 
-    depend = listOf("PlasmoVoice", "ProtocolLib", "pv-addon-lavaplayer-lib")
+    depend = listOf("PlasmoVoice", "packetevents", "pv-addon-lavaplayer-lib")
 
     foliaSupported = true
 

@@ -20,7 +20,7 @@ import org.bukkit.event.inventory.InventoryMoveItemEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.world.ChunkLoadEvent
 import org.bukkit.event.world.ChunkUnloadEvent
-import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.plugin.java.JavaPlugin
 import org.koin.core.component.inject
 import su.plo.slib.api.chat.component.McTextComponent
@@ -35,6 +35,7 @@ import su.plo.voice.discs.AddonKeys
 import su.plo.voice.discs.PlasmoAudioPlayerManager
 import su.plo.voice.discs.utils.PluginKoinComponent
 import su.plo.voice.discs.utils.extend.*
+import java.util.concurrent.ConcurrentHashMap
 
 class JukeboxEventListener : Listener, PluginKoinComponent {
 
@@ -46,7 +47,7 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
     private val debugLogger: DebugLogger by getter()
     private val sourceLine: ServerSourceLine by getter()
 
-    private val jobByBlock: MutableMap<Block, Job> = HashMap()
+    private val jobByBlock: MutableMap<Block, Job> = ConcurrentHashMap()
 
     @EventHandler
     fun onChunkLoad(event: ChunkLoadEvent): Unit = with(keys) {
@@ -75,7 +76,7 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
 
         if (event.action != Action.RIGHT_CLICK_BLOCK) return
 
-        if (event.player.gameMode == GameMode.ADVENTURE) return
+        if (event.player.gameMode == GameMode.ADVENTURE && Bukkit.getServer().getMinecraftVersionInt() < 12100) return
 
         val block = event.clickedBlock ?: return
 
@@ -102,7 +103,7 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
         )
 
         jobByBlock[block]?.cancel()
-        jobByBlock[block] = playTrack(identifier, block, item, voicePlayer)
+        jobByBlock[block] = playTrack(identifier, block, item.itemMeta, voicePlayer)
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -140,10 +141,13 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
             .forEach { jobByBlock.remove(it)?.cancel() }
     }
 
+    fun isPlaying(block: Block): Boolean =
+        jobByBlock.containsKey(block)
+
     private fun playTrack(
         identifier: String,
         block: Block,
-        item: ItemStack,
+        itemMeta: ItemMeta?,
         voicePlayer: VoicePlayer? = null,
     ): Job = CoroutineScope(Dispatchers.Default).launch {
 
@@ -165,7 +169,7 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
             return@launch
         }
 
-        val trackName = item.itemMeta
+        val trackName = itemMeta
             ?.lore()
             ?.getOrNull(0)
             ?.let { it as? TextComponent }
@@ -296,7 +300,7 @@ class JukeboxEventListener : Listener, PluginKoinComponent {
             val identifier = item.customDiscIdentifier() ?: return
 
             jobByBlock.remove(block)?.cancel()
-            jobByBlock[block] = playTrack(identifier, block, item)
+            jobByBlock[block] = playTrack(identifier, block, item.itemMeta)
         }
     }
 }

@@ -1,8 +1,7 @@
 package su.plo.voice.discs
 
-import com.comphenix.protocol.ProtocolLibrary
-import com.comphenix.protocol.ProtocolManager
-import com.comphenix.protocol.events.ListenerPriority
+import com.github.retrooper.packetevents.PacketEvents
+import com.github.retrooper.packetevents.event.PacketListenerPriority
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
 import org.koin.dsl.koinApplication
@@ -23,10 +22,11 @@ import su.plo.voice.discs.command.subcommand.CancelCommand
 import su.plo.voice.discs.command.subcommand.EraseCommand
 import su.plo.voice.discs.command.subcommand.SearchCommand
 import su.plo.voice.discs.crafting.BurnableDiscCraft
+import su.plo.voice.discs.crafting.BurnableHornCraft
 import su.plo.voice.discs.event.ForbidGrindstoneListener
 import su.plo.voice.discs.event.JukeboxEventListener
+import su.plo.voice.discs.item.DiscHelper
 import su.plo.voice.discs.item.GoatHornHelper
-import su.plo.voice.discs.crafting.BurnableHornCraft
 import su.plo.voice.discs.packet.CancelJukeboxPlayEvent
 import su.plo.voice.discs.utils.KOIN_INSTANCE
 import su.plo.voice.discs.utils.extend.debug
@@ -49,6 +49,18 @@ class DiscsPlugin : JavaPlugin() {
 
     private val keys = AddonKeys.of(this@DiscsPlugin)
 
+    private val discHelper: DiscHelper by lazy {
+        val mcVersion = Bukkit.getServer().getMinecraftVersionInt()
+
+        if (mcVersion >= 12105) {
+            su.plo.voice.discs.v1_21_5.DiscHelperImpl()
+        } else if (mcVersion >= 12103) {
+            su.plo.voice.discs.v1_21_3.DiscHelperImpl()
+        } else {
+            throw IllegalArgumentException("Disc helper in $mcVersion is not supported!")
+        } as DiscHelper
+    }
+
     private val goatHornHelper: GoatHornHelper by lazy {
         val mcVersion = Bukkit.getServer().getMinecraftVersionInt()
 
@@ -60,7 +72,7 @@ class DiscsPlugin : JavaPlugin() {
             su.plo.voice.discs.v1_19_4.GoatHornHelperImpl()
         } else {
             throw IllegalArgumentException("Goat horns in $mcVersion is not supported!")
-        }
+        } as GoatHornHelper
     }
 
     private val goatHornManager by lazy {
@@ -94,6 +106,7 @@ class DiscsPlugin : JavaPlugin() {
                         single<JavaPlugin> { this@DiscsPlugin }
                         single<AddonKeys> { keys }
                         factory<DebugLogger> { debugLogger }
+                        single<DiscHelper> { discHelper }
                     }
                 )
             }.koin
@@ -137,10 +150,9 @@ class DiscsPlugin : JavaPlugin() {
         val permissions = voiceServer.minecraftServer.permissionManager
         permissions.registerBukkit("pv.addon.discs.play", PermissionDefault.TRUE)
 
-        val protocolManager: ProtocolManager = ProtocolLibrary.getProtocolManager()
-
-        protocolManager.addPacketListener(
-            CancelJukeboxPlayEvent(this, keys, ListenerPriority.NORMAL)
+        PacketEvents.getAPI().eventManager.registerListener(
+            CancelJukeboxPlayEvent(keys, jukeboxEventListener),
+            PacketListenerPriority.NORMAL
         )
 
         if (addonConfig.burnableTag.enableDefaultRecipe) {
